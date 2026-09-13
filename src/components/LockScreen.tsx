@@ -12,7 +12,7 @@ interface LockScreenProps {
 export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
   const [isSetup, setIsSetup] = useState(true);
   const [token, setToken] = useState('');
-  const [pin, setPin] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -23,20 +23,30 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
     }
   }, []);
 
+  const validatePassword = (pass: string) => {
+    if (pass.length < 8) return 'Password must be at least 8 characters.';
+    if (!/[A-Z]/.test(pass)) return 'Password must contain at least 1 uppercase letter.';
+    if (!/[0-9]/.test(pass)) return 'Password must contain at least 1 number.';
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pass)) return 'Password must contain at least 1 special character.';
+    return null;
+  };
+
   const handleSetup = () => {
     setError('');
     if (!token.trim()) {
       setError('Please enter a valid Figma token.');
       return;
     }
-    if (pin.length !== 6 || !/^\d+$/.test(pin)) {
-      setError('PIN must be exactly 6 digits.');
+    
+    const passError = validatePassword(password);
+    if (passError) {
+      setError(passError);
       return;
     }
 
     try {
-      // Encrypt the token using the PIN as the secret key
-      const encrypted = CryptoJS.AES.encrypt(token.trim(), pin).toString();
+      // Encrypt the token using the password as the secret key
+      const encrypted = CryptoJS.AES.encrypt(token.trim(), password).toString();
       localStorage.setItem('figma_token_encrypted', encrypted);
       onUnlock(token.trim());
     } catch (err) {
@@ -46,8 +56,8 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
 
   const handleUnlock = () => {
     setError('');
-    if (pin.length !== 6 || !/^\d+$/.test(pin)) {
-      setError('PIN must be exactly 6 digits.');
+    if (!password) {
+      setError('Please enter your password.');
       return;
     }
 
@@ -61,16 +71,16 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
           return;
         }
 
-        const bytes = CryptoJS.AES.decrypt(encrypted, pin);
+        const bytes = CryptoJS.AES.decrypt(encrypted, password);
         const originalToken = bytes.toString(CryptoJS.enc.Utf8);
 
         if (!originalToken) {
-          throw new Error('Invalid PIN');
+          throw new Error('Invalid Password');
         }
 
         onUnlock(originalToken);
       } catch (err) {
-        setError('Incorrect PIN. Could not decrypt token.');
+        setError('Incorrect password. Could not decrypt token.');
       } finally {
         setLoading(false);
       }
@@ -81,7 +91,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
     if (confirm('Are you sure you want to reset your token? This will delete the encrypted token from your browser.')) {
       localStorage.removeItem('figma_token_encrypted');
       setToken('');
-      setPin('');
+      setPassword('');
       setError('');
       setIsSetup(true);
     }
@@ -107,8 +117,8 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
           </CardTitle>
           <CardDescription>
             {isSetup 
-              ? 'Enter your Figma Token and create a 6-digit PIN to securely encrypt it.' 
-              : 'Enter your 6-digit PIN to decrypt your Figma Token.'}
+              ? 'Enter your Figma Token and create a strong Master Password to securely encrypt it.' 
+              : 'Enter your Master Password to decrypt your Figma Token.'}
           </CardDescription>
         </CardHeader>
         
@@ -134,27 +144,19 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
           )}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">{isSetup ? 'Create 6-Digit PIN' : 'Enter 6-Digit PIN'}</label>
-            <div className="flex justify-center">
-              <Input
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                placeholder="••••••"
-                className="text-center tracking-[1em] font-mono text-lg"
-                value={pin}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  setPin(val);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    isSetup ? handleSetup() : handleUnlock();
-                  }
-                }}
-              />
-            </div>
+            <label className="text-sm font-medium">{isSetup ? 'Create Master Password' : 'Enter Master Password'}</label>
+            <Input
+              type="password"
+              placeholder="Min 8 chars, 1 uppercase, 1 number, 1 special"
+              className="font-mono"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  isSetup ? handleSetup() : handleUnlock();
+                }
+              }}
+            />
           </div>
         </CardContent>
 
@@ -162,7 +164,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
           <Button 
             className="w-full" 
             onClick={isSetup ? handleSetup : handleUnlock}
-            disabled={loading || pin.length !== 6 || (isSetup && !token)}
+            disabled={loading || !password || (isSetup && !token)}
           >
             {isSetup ? 'Encrypt & Save Token' : 'Decrypt & Unlock'}
           </Button>
@@ -170,7 +172,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
           {!isSetup && (
             <Button variant="ghost" className="w-full text-slate-500 hover:text-red-500" onClick={handleReset}>
               <RefreshCw className="w-4 h-4 mr-2" />
-              Forgot PIN? Reset Vault
+              Forgot Password? Reset Vault
             </Button>
           )}
         </CardFooter>
