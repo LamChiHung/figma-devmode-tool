@@ -164,7 +164,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
           <Button 
             className="w-full" 
             onClick={isSetup ? handleSetup : handleUnlock}
-            disabled={loading || !password || (isSetup && !token)}
+            disabled={loading || (isSetup ? !!validatePassword(password) || !token : !password)}
           >
             {isSetup ? 'Encrypt & Save Token' : 'Decrypt & Unlock'}
           </Button>
