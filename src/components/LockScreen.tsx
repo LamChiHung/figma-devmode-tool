@@ -13,6 +13,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
   const [isSetup, setIsSetup] = useState(true);
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
+  const [debouncedPassword, setDebouncedPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,6 +23,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
       setIsSetup(false);
     }
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPassword(password);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [password]);
 
   const validatePassword = (pass: string) => {
     if (pass.length < 8) return 'Password must be at least 8 characters.';
@@ -157,6 +165,16 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
                 }
               }}
             />
+            {isSetup && debouncedPassword.length > 0 && validatePassword(debouncedPassword) && (
+              <p className="text-xs text-amber-600 dark:text-amber-500 animate-in fade-in slide-in-from-top-1">
+                {validatePassword(debouncedPassword)}
+              </p>
+            )}
+            {isSetup && debouncedPassword.length > 0 && !validatePassword(debouncedPassword) && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-500 animate-in fade-in slide-in-from-top-1">
+                ✓ Password is strong and meets all requirements.
+              </p>
+            )}
           </div>
         </CardContent>
 
