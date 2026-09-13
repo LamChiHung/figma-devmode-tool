@@ -101,16 +101,24 @@ export const Inspector: React.FC<InspectorProps> = ({ node, variablesData }) => 
   // Fills
   const fills = node.fills || [];
   const bgFills = fills.filter((f: any) => f.type === 'SOLID' && f.visible !== false);
-  const bgVariable = getBoundVariable('COLOR', ['fills', '0']); // Assuming first fill
+  let bgVariable: any = null;
   if (bgFills.length > 0) {
+    bgVariable = getBoundVariable('COLOR', ['fills', '0']);
+    if (!bgVariable && bgFills[0].boundVariables && bgFills[0].boundVariables.color) {
+      bgVariable = resolveVariable(bgFills[0].boundVariables.color.id);
+    }
     cssProps.push(`background-color: ${rgbaToCss(bgFills[0].color)};${bgVariable ? ` /* var(--${bgVariable.name}) */` : ''}`);
   }
 
   // Strokes
   const strokes = node.strokes || [];
   const strokeFills = strokes.filter((f: any) => f.type === 'SOLID' && f.visible !== false);
-  const strokeVariable = getBoundVariable('COLOR', ['strokes', '0']); 
+  let strokeVariable: any = null;
   if (strokeFills.length > 0) {
+    strokeVariable = getBoundVariable('COLOR', ['strokes', '0']); 
+    if (!strokeVariable && strokeFills[0].boundVariables && strokeFills[0].boundVariables.color) {
+      strokeVariable = resolveVariable(strokeFills[0].boundVariables.color.id);
+    }
     cssProps.push(`border: ${node.strokeWeight || 1}px solid ${rgbaToCss(strokeFills[0].color)};${strokeVariable ? ` /* var(--${strokeVariable.name}) */` : ''}`);
   }
 
@@ -192,8 +200,8 @@ export const Inspector: React.FC<InspectorProps> = ({ node, variablesData }) => 
             <div>
               <h3 className="text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Size</h3>
               <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded text-xs grid grid-cols-2 gap-2">
-                <div><span className="text-slate-500">W:</span> {node.absoluteBoundingBox.width}</div>
-                <div><span className="text-slate-500">H:</span> {node.absoluteBoundingBox.height}</div>
+                <div><span className="text-slate-500">W:</span> {Math.round(node.absoluteBoundingBox.width)}</div>
+                <div><span className="text-slate-500">H:</span> {Math.round(node.absoluteBoundingBox.height)}</div>
               </div>
             </div>
           )}
