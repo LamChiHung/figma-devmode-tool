@@ -1,0 +1,180 @@
+import React, { useState, useEffect } from 'react';
+import CryptoJS from 'crypto-js';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Lock, Unlock, KeyRound, AlertCircle, RefreshCw } from 'lucide-react';
+
+interface LockScreenProps {
+  onUnlock: (token: string) => void;
+}
+
+export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
+  const [isSetup, setIsSetup] = useState(true);
+  const [token, setToken] = useState('');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const encrypted = localStorage.getItem('figma_token_encrypted');
+    if (encrypted) {
+      setIsSetup(false);
+    }
+  }, []);
+
+  const handleSetup = () => {
+    setError('');
+    if (!token.trim()) {
+      setError('Please enter a valid Figma token.');
+      return;
+    }
+    if (pin.length !== 6 || !/^\d+$/.test(pin)) {
+      setError('PIN must be exactly 6 digits.');
+      return;
+    }
+
+    try {
+      // Encrypt the token using the PIN as the secret key
+      const encrypted = CryptoJS.AES.encrypt(token.trim(), pin).toString();
+      localStorage.setItem('figma_token_encrypted', encrypted);
+      onUnlock(token.trim());
+    } catch (err) {
+      setError('Failed to encrypt token. Please try again.');
+    }
+  };
+
+  const handleUnlock = () => {
+    setError('');
+    if (pin.length !== 6 || !/^\d+$/.test(pin)) {
+      setError('PIN must be exactly 6 digits.');
+      return;
+    }
+
+    setLoading(true);
+    // Simulate slight delay to prevent brute-force feeling (purely UI)
+    setTimeout(() => {
+      try {
+        const encrypted = localStorage.getItem('figma_token_encrypted');
+        if (!encrypted) {
+          setIsSetup(true);
+          return;
+        }
+
+        const bytes = CryptoJS.AES.decrypt(encrypted, pin);
+        const originalToken = bytes.toString(CryptoJS.enc.Utf8);
+
+        if (!originalToken) {
+          throw new Error('Invalid PIN');
+        }
+
+        onUnlock(originalToken);
+      } catch (err) {
+        setError('Incorrect PIN. Could not decrypt token.');
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+  };
+
+  const handleReset = () => {
+    if (confirm('Are you sure you want to reset your token? This will delete the encrypted token from your browser.')) {
+      localStorage.removeItem('figma_token_encrypted');
+      setToken('');
+      setPin('');
+      setError('');
+      setIsSetup(true);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
+      <div className="text-center space-y-2 mb-8">
+        <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-50 flex items-center justify-center">
+          <KeyRound className="w-10 h-10 mr-3 text-indigo-500" />
+          Figma Explorer Vault
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400">
+          Your personal access token is securely encrypted with AES on your device.
+        </p>
+      </div>
+
+      <Card className="w-full max-w-md shadow-xl border-slate-200/60 dark:border-slate-800/60">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            {isSetup ? <Lock className="w-5 h-5 mr-2 text-blue-500" /> : <Unlock className="w-5 h-5 mr-2 text-emerald-500" />}
+            {isSetup ? 'Setup Vault' : 'Unlock Vault'}
+          </CardTitle>
+          <CardDescription>
+            {isSetup 
+              ? 'Enter your Figma Token and create a 6-digit PIN to securely encrypt it.' 
+              : 'Enter your 6-digit PIN to decrypt your Figma Token.'}
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          {error && (
+            <div className="flex items-center p-3 bg-red-50 text-red-600 rounded border border-red-100 text-sm">
+              <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {isSetup && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Figma Personal Access Token</label>
+              <Input
+                type="password"
+                placeholder="figd_..."
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+              />
+              <p className="text-xs text-slate-500">Get this from Figma Settings {'->'} Personal Access Tokens.</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">{isSetup ? 'Create 6-Digit PIN' : 'Enter 6-Digit PIN'}</label>
+            <div className="flex justify-center">
+              <Input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                placeholder="••••••"
+                className="text-center tracking-[1em] font-mono text-lg"
+                value={pin}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setPin(val);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    isSetup ? handleSetup() : handleUnlock();
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex flex-col space-y-3">
+          <Button 
+            className="w-full" 
+            onClick={isSetup ? handleSetup : handleUnlock}
+            disabled={loading || pin.length !== 6 || (isSetup && !token)}
+          >
+            {isSetup ? 'Encrypt & Save Token' : 'Decrypt & Unlock'}
+          </Button>
+
+          {!isSetup && (
+            <Button variant="ghost" className="w-full text-slate-500 hover:text-red-500" onClick={handleReset}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Forgot PIN? Reset Vault
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
+    </div>
+  );
+};
